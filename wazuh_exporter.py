@@ -38,13 +38,6 @@ wazuh_agent_status = Gauge(
     ["agent_id", "agent_name"],
 )
 
-wazuh_vulnerabilities_total = Gauge(
-    "wazuh_vulnerabilities_total", "Total vulnerabilities by severity", ["severity"]
-)
-wazuh_alerts_by_level_total = Gauge(
-    "wazuh_alerts_by_level_total", "Total alerts by rule level", ["level"]
-)
-
 wazuh_api_scrape_errors_total = Counter(
     "wazuh_api_scrape_errors_total",
     "Total number of errors encountered scraping the Wazuh API",
@@ -150,7 +143,7 @@ def collect_metrics():
         agent_summary_data = api_request("/agents/summary/status")
         wazuh_agents_total.clear()
         if agent_summary_data:
-            for status, count in agent_summary_data["data"].items():
+            for status, count in agent_summary_data["data"]["connection"].items():
                 wazuh_agents_total.labels(status=status).set(count)
 
         # --- 3. Per-Agent Status ---
@@ -165,30 +158,6 @@ def collect_metrics():
                 wazuh_agent_status.labels(
                     agent_id=agent["id"], agent_name=agent["name"]
                 ).set(status_val)
-
-        # --- 4. Key Metrics (Aggregates) ---
-
-        # Vulnerability Summary
-        wazuh_vulnerabilities_total.clear()
-        for severity in ["Critical", "High", "Medium", "Low"]:
-            vuln_data = api_request(
-                "/vulnerability", params={"limit": 1, "search": f"severity={severity}"}
-            )
-            if vuln_data:
-                wazuh_vulnerabilities_total.labels(severity=severity.lower()).set(
-                    vuln_data["data"]["total_affected_items"]
-                )
-
-        # Alert Summary by Level
-        alert_summary_data = api_request(
-            "/alerts/summary", params={"fields": "rule.level"}
-        )
-        wazuh_alerts_by_level_total.clear()
-        if alert_summary_data:
-            for item in alert_summary_data["data"].get("rule.level", []):
-                wazuh_alerts_by_level_total.labels(level=item["key"]).set(
-                    item["doc_count"]
-                )
 
         logging.info("Successfully scraped all metrics.")
 
