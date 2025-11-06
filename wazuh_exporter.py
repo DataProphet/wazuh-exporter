@@ -28,11 +28,6 @@ wazuh_api_up = Gauge("wazuh_api_up", "Wazuh API health status (1=up, 0=down)")
 wazuh_manager_up = Gauge(
     "wazuh_manager_up", "Wazuh manager service status (1=up, 0=down)"
 )
-wazuh_indexer_health = Gauge(
-    "wazuh_indexer_health",
-    "Wazuh indexer cluster health (1=green/yellow, 0=red/error)",
-    ["status"],
-)
 
 wazuh_agents_total = Gauge(
     "wazuh_agents_total", "Total number of Wazuh agents by status", ["status"]
@@ -151,24 +146,14 @@ def collect_metrics():
         else:
             wazuh_manager_up.set(0)
 
-        # --- 2. Indexer Health ---
-        indexer_health_data = api_request("/indexer/health")
-        wazuh_indexer_health.clear()  # Clear old status labels
-        if indexer_health_data:
-            status = indexer_health_data.get("status", "unknown")
-            health_value = 1 if status in ["green", "yellow"] else 0
-            wazuh_indexer_health.labels(status=status).set(health_value)
-        else:
-            wazuh_indexer_health.labels(status="unknown").set(0)
-
-        # --- 3. Agent Summary (Total Agents) ---
+        # --- 2. Agent Summary (Total Agents) ---
         agent_summary_data = api_request("/agents/summary/status")
         wazuh_agents_total.clear()
         if agent_summary_data:
             for status, count in agent_summary_data["data"].items():
                 wazuh_agents_total.labels(status=status).set(count)
 
-        # --- 4. Per-Agent Status ---
+        # --- 3. Per-Agent Status ---
         # Wazuh API max limit is 100,000
         agent_list_data = api_request(
             "/agents", params={"limit": 100000, "select": "id,name,status"}
@@ -181,7 +166,7 @@ def collect_metrics():
                     agent_id=agent["id"], agent_name=agent["name"]
                 ).set(status_val)
 
-        # --- 5. Key Metrics (Aggregates) ---
+        # --- 4. Key Metrics (Aggregates) ---
 
         # Vulnerability Summary
         wazuh_vulnerabilities_total.clear()
